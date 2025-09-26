@@ -33,7 +33,7 @@ const wagmiConfig = createConfig({
   connectors: [
     injected(),
     walletConnect({
-      projectId: 'b56e18d47c72ab683b10814fe9495694',
+      projectId: '89dce935712eb0e41b2733671f25ff82',
       qrModalOptions: {
         explorerRecommendedWalletIds: [
           'd01c7758d741b363e637a817a09bcf579feae4db9f5bb16f599fdd1f66e2f974', // Valora
