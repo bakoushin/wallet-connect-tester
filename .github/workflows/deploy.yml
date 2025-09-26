@@ -35,6 +35,8 @@ jobs:
 
       - name: Build
         run: yarn build
+        env:
+          VITE_BASE_URL: /${{ github.event.repository.name }}/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
