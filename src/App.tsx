@@ -10,12 +10,9 @@ import { mainnet, polygon, arbitrum, base, optimism, celo } from 'viem/chains'
 import { injected } from 'wagmi/connectors'
 import { walletConnect } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  getCapabilities,
-  type GetCapabilitiesErrorType,
-  type GetCapabilitiesReturnType,
-} from 'wagmi/actions'
+import { getCapabilities, sendCalls } from 'wagmi/actions'
 import { useState } from 'react'
+import { parseUnits, erc20Abi, type Hex } from 'viem'
 
 const chains = [mainnet, base, celo, optimism, arbitrum, polygon] as const
 
@@ -49,24 +46,64 @@ function Capabilities() {
   const { address, chainId, status } = useAccount()
   const { connectors, connect, error: connectError } = useConnect()
   const { disconnect } = useDisconnect()
-  const [capabilities, setCapabilities] =
-    useState<GetCapabilitiesReturnType | null>(null)
-  const [capabilitiesError, setCapabilitiesError] =
-    useState<GetCapabilitiesErrorType | null>(null)
+  const [requestResult, setRequestResult] = useState<any>(null)
+  const [requestError, setRequestError] = useState<Error | null>(null)
 
   const handleDisconnect = () => {
     disconnect()
-    setCapabilities(null)
-    setCapabilitiesError(null)
+    setRequestResult(null)
+    setRequestError(null)
   }
 
   const handleGetCapabilities = async () => {
+    setRequestResult(null)
+    setRequestError(null)
     try {
       const capabilities = await getCapabilities(wagmiConfig)
-      setCapabilities(capabilities)
-      setCapabilitiesError(null)
+      setRequestResult(capabilities)
     } catch (error) {
-      setCapabilitiesError(error as GetCapabilitiesErrorType)
+      setRequestError(error as Error)
+    }
+  }
+
+  const handleSendCallsAtomic = async () => {
+    return handleSendCalls({ forceAtomic: true })
+  }
+
+  const handleSendCallsNonAtomic = async () => {
+    return handleSendCalls({ forceAtomic: false })
+  }
+
+  const handleSendCalls = async ({ forceAtomic }: { forceAtomic: boolean }) => {
+    if (!address) return
+
+    setRequestResult(null)
+    setRequestError(null)
+
+    try {
+      const calls = [
+        {
+          abi: erc20Abi,
+          functionName: 'transfer',
+          to: '0x765de816845861e75a25fca122bb6898b8b1282a' as Hex, // cUSD
+          args: [address, parseUnits('0.0001', 18)],
+        },
+        {
+          abi: erc20Abi,
+          functionName: 'transfer',
+          to: '0xceba9300f2b948710d2653dd7b07f33a8b32118c' as Hex, // USDC
+          args: [address, parseUnits('0.0001', 6)],
+        },
+      ]
+
+      const result = await sendCalls(wagmiConfig, {
+        calls,
+        chainId: celo.id,
+        forceAtomic,
+      })
+      setRequestResult(result)
+    } catch (error) {
+      setRequestError(error as Error)
     }
   }
 
@@ -86,14 +123,22 @@ function Capabilities() {
       )}
       {connectError && <div>{connectError.message}</div>}
       {status === 'connected' && (
-        <button onClick={handleGetCapabilities}>Get Capabilities</button>
+        <>
+          <button onClick={handleGetCapabilities}>Get Capabilities</button>
+          <button onClick={handleSendCallsNonAtomic}>
+            sendCalls (atomic optional)
+          </button>
+          <button onClick={handleSendCallsAtomic}>
+            sendCalls (atomic required)
+          </button>
+        </>
       )}
-      {capabilities && (
+      {requestResult && (
         <pre>
-          <div>{JSON.stringify(capabilities, null, 2)}</div>
+          <div>{JSON.stringify(requestResult, null, 2)}</div>
         </pre>
       )}
-      {capabilitiesError && <div>{capabilitiesError.message}</div>}
+      {requestError && <div>{requestError.message}</div>}
     </div>
   )
 }
