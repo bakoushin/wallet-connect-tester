@@ -10,7 +10,7 @@ import { mainnet, polygon, arbitrum, base, optimism, celo } from 'viem/chains'
 import { injected } from 'wagmi/connectors'
 import { walletConnect } from 'wagmi/connectors'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { getCapabilities, sendCalls } from 'wagmi/actions'
+import { getCapabilities, sendCalls, getCallsStatus } from 'wagmi/actions'
 import { useState } from 'react'
 import { parseUnits, erc20Abi, type Hex } from 'viem'
 
@@ -48,6 +48,7 @@ function Capabilities() {
   const { disconnect } = useDisconnect()
   const [requestResult, setRequestResult] = useState<any>(null)
   const [requestError, setRequestError] = useState<Error | null>(null)
+  const [sendCallsIds, setSendCallsIds] = useState<string[]>([])
 
   const handleDisconnect = () => {
     disconnect()
@@ -100,8 +101,10 @@ function Capabilities() {
         calls,
         chainId: celo.id,
         forceAtomic,
+        id: Math.floor(100_000 * Math.random()).toString(),
       })
       setRequestResult(result)
+      setSendCallsIds((prev) => [...prev, result.id])
     } catch (error) {
       setRequestError(error as Error)
     }
@@ -139,8 +142,54 @@ function Capabilities() {
         </pre>
       )}
       {requestError && <div>{requestError.message}</div>}
+      {sendCallsIds.length > 0 && (
+        <div>
+          <h3>Send Calls IDs</h3>
+          <ul>
+            {sendCallsIds.map((id) => (
+              <li key={id}>
+                <pre>{id}</pre>
+                <SendCallsStatus id={id} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
+}
+
+function SendCallsStatus({ id }: { id: string }) {
+  const [statusData, setStatusData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+
+  const handleGetStatus = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const status = await getCallsStatus(wagmiConfig, { id })
+      setStatusData(status)
+    } catch (err) {
+      setError(err as Error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={handleGetStatus} disabled={isLoading}>
+        {isLoading ? 'Loading...' : 'Get Call Status'}
+      </button>
+      {error && <div>Error: {error.message}</div>}
+      {statusData && <pre>{JSON.stringify(statusData, bigintToString, 2)}</pre>}
+    </div>
+  )
+}
+
+function bigintToString(_key: string, value: any) {
+  return typeof value === 'bigint' ? value.toString() : value
 }
 
 export default function App() {
